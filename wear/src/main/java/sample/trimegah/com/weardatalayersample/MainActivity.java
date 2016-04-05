@@ -9,18 +9,21 @@ import com.google.android.gms.wearable.MessageEvent;
 import android.app.Activity;
 import android.os.Bundle;
 import android.support.wearable.view.WatchViewStub;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
+
+import java.util.Random;
 
 import jp.android.a.akira.library.okwear.OkWear;
 import jp.android.a.akira.library.okwear.listener.SendResultListener;
 import jp.android.a.akira.library.okwear.listener.WearReceiveListener;
 import jp.android.a.akira.library.okwear.util.Payload;
 
-public class MainActivity extends Activity implements WearReceiveListener {
+public class MainActivity extends Activity implements View.OnClickListener, WearReceiveListener {
 
-    private static final String PATH = "/path";
+    private static final String TAG = MainActivity.class.getSimpleName();
 
     private static final String USERNAME_KEY = "username";
 
@@ -40,6 +43,18 @@ public class MainActivity extends Activity implements WearReceiveListener {
         initDataLayerApi();
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        okWear.connect();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        okWear.disconnect();
+    }
+
     private void initLayout() {
         final WatchViewStub stub = (WatchViewStub) findViewById(R.id.watch_view_stub);
         stub.setOnLayoutInflatedListener(new WatchViewStub.OnLayoutInflatedListener() {
@@ -47,7 +62,7 @@ public class MainActivity extends Activity implements WearReceiveListener {
             public void onLayoutInflated(WatchViewStub stub) {
                 textView = (TextView) stub.findViewById(R.id.text);
                 sendButton = (Button) stub.findViewById(R.id.sendButton);
-                sendButton.setOnClickListener(clickListener);
+                sendButton.setOnClickListener(MainActivity.this);
             }
         });
     }
@@ -57,25 +72,24 @@ public class MainActivity extends Activity implements WearReceiveListener {
         okWear.registReceiver(this);
     }
 
-    private View.OnClickListener clickListener = new View.OnClickListener() {
-        @Override
-        public void onClick(View v) {
-            syncDataToMobile();
-        }
-    };
-
     private void syncDataToMobile() {
-        Payload payload = new Payload.Builder(PATH)
+        int randomId = new Random().nextInt();
+        Payload payload = new Payload.Builder(OkWear.DEFAULT_DATA_API_PATH)
             .addPayload(USERNAME_KEY, "Trim")
-            .addPayload(USERPASS_KEY, "pass123")
+            .addPayload(USERPASS_KEY, "pass123" + randomId)
             .build();
 
         okWear.syncData(payload, new SendResultListener<DataApi.DataItemResult>() {
             @Override
             public void onResult(DataApi.DataItemResult result) {
-                textView.setText("Sending data to mobile ... with status : " + result.getStatus());
+                Log.v(TAG, result.getStatus().toString());
             }
         });
+    }
+
+    @Override
+    public void onClick(View v) {
+        syncDataToMobile();
     }
 
     @Override
@@ -88,7 +102,12 @@ public class MainActivity extends Activity implements WearReceiveListener {
             final DataMap dataMap = DataMap.fromByteArray(event.getDataItem().getData());
             final String username = dataMap.getString(USERNAME_KEY);
             final String userpass = dataMap.getString(USERPASS_KEY);
-            textView.setText(username + "|" + userpass);
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    textView.setText(username + "|" + userpass);
+                }
+            });
         }
     }
 }
